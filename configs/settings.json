@@ -1,0 +1,37 @@
+{
+    "public": {
+      "recaptchaSiteKey": "YOUR_RECAPTCHA_SITE_KEY",
+      "googleMaps": {
+        "publicApiKey": ""
+      },
+      "contactEmail": "refugerestrooms@gmail.com",
+      "production": {
+        "apiUrl": "https://www.refugerestrooms.org/api/v1",
+        "originUrl": "https://www.refugerestrooms.org"
+      },
+      "useProductionAPI": true
+    },
+    "private": {
+      "recaptchaSecretKey": "YOUR_RECAPTCHA_SECRET_KEY",
+      "googleMaps": {
+        "apiKey": ""
+      },
+      "email": {
+        "smtp": "smtps://username:password@smtp.example.com:465",
+        "from": "noreply@refugerestrooms.org",
+        "adminEmail": "admin@refugerestrooms.org"
+      },
+      "adminUsers": [
+        "admin@refugerestrooms.org"
+      ],
+      "enableHydration": true
+    },
+    "galaxy.meteor.com": {
+      "env": {
+        "MONGO_URL": "mongodb://user:password@mongodb.example.com:27017/refuge",
+        "ROOT_URL": "https://refugerestrooms.meteorapp.com",
+        "MAIL_URL": "smtps://username:password@smtp.example.com:465",
+        "ENABLE_HYDRATION": "true"
+      }
+    }
+  }

@@ -1,0 +1,60 @@
+{
+    "common": {
+      "loading": "Chargement...",
+      "back": "Retour",
+      "back-to-list": "Retour à la liste",
+      "submit": "Soumettre",
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "yes": "Oui",
+      "no": "Non",
+      "error": "Erreur",
+      "success": "Succès"
+    },
+    "navigation": {
+      "submit-a-new-restroom": "Ajouter de nouvelles toilettes",
+      "about": "À propos",
+      "contact": "Contact",
+      "resources": "Ressources",
+      "signs": "Signalisation toilettes",
+      "api": "API publique",
+      "toggle-navigation-button-label": "Basculer la navigation"
+    },
+    "search": {
+      "placeholder": "Rechercher par emplacement...",
+      "aria-label": "Rechercher des toilettes",
+      "submit": "Rechercher",
+      "use-location": "Utiliser ma position actuelle",
+      "geolocation-not-supported": "La géolocalisation n'est pas prise en charge par votre navigateur",
+      "geolocation-error": "Erreur lors de l'obtention de votre position. Veuillez réessayer ou rechercher manuellement."
+    },
+    "home": {
+      "find-refuge": "Trouver des toilettes",
+      "life-is-tough": "La vie est difficile quand on vous refuse l'accès à un droit humain fondamental.",
+      "add-restroom-button-label": "Ajouter des toilettes",
+      "html-alt-attributes": {
+        "app-store": "Télécharger sur l'App Store",
+        "play-store": "Obtenir sur Google Play",
+        "patreon": "Soutenez-nous sur Patreon"
+      }
+    },
+    "restroom": {
+      "accessible": "Accessible",
+      "not_accessible": "Non accessible",
+      "changing_table": "Table à langer",
+      "no_changing_table": "Sans table à langer",
+      "type": {
+        "unisex": "Unisexe",
+        "single_stall": "Cabine unique"
+      },
+      "add_new": "Ajouter de nouvelles toilettes",
+      "rating": {
+        "title": "Évaluation",
+        "unrated": "Ces toilettes n'ont pas encore été évaluées.",
+        "positive": "{{percentage}}% positif",
+        "based-on": "Basé sur {{count}} évaluations"
+      }
+    }
+  }

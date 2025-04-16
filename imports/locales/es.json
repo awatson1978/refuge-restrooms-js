@@ -1,0 +1,60 @@
+{
+    "common": {
+      "loading": "Cargando...",
+      "back": "Atrás",
+      "back-to-list": "Volver a la lista",
+      "submit": "Enviar",
+      "cancel": "Cancelar",
+      "save": "Guardar",
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "yes": "Sí",
+      "no": "No",
+      "error": "Error",
+      "success": "Éxito"
+    },
+    "navigation": {
+      "submit-a-new-restroom": "Añadir un nuevo baño",
+      "about": "Acerca de",
+      "contact": "Contacto",
+      "resources": "Recursos",
+      "signs": "Señales de baño",
+      "api": "API pública",
+      "toggle-navigation-button-label": "Alternar navegación"
+    },
+    "search": {
+      "placeholder": "Buscar por ubicación...",
+      "aria-label": "Buscar baños",
+      "submit": "Buscar",
+      "use-location": "Usar ubicación actual",
+      "geolocation-not-supported": "La geolocalización no es compatible con tu navegador",
+      "geolocation-error": "Error al obtener tu ubicación. Inténtalo de nuevo o busca manualmente."
+    },
+    "home": {
+      "find-refuge": "Encuentra un baño",
+      "life-is-tough": "La vida es difícil cuando se te niega acceso a un derecho humano básico.",
+      "add-restroom-button-label": "Añadir un baño",
+      "html-alt-attributes": {
+        "app-store": "Descargar en App Store",
+        "play-store": "Obtener en Google Play",
+        "patreon": "Apóyanos en Patreon"
+      }
+    },
+    "restroom": {
+      "accessible": "Accesible",
+      "not_accessible": "No accesible",
+      "changing_table": "Cambiador",
+      "no_changing_table": "Sin cambiador",
+      "type": {
+        "unisex": "Unisex",
+        "single_stall": "Cabina individual"
+      },
+      "add_new": "Añadir un nuevo baño",
+      "rating": {
+        "title": "Valoración",
+        "unrated": "Este baño no ha sido valorado todavía.",
+        "positive": "{{percentage}}% positivo",
+        "based-on": "Basado en {{count}} valoraciones"
+      }
+    }
+  }

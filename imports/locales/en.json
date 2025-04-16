@@ -1,0 +1,200 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "back": "Back",
+    "back-to-list": "Back to List",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "yes": "Yes",
+    "no": "No",
+    "error": "Error",
+    "success": "Success"
+  },
+  "navigation": {
+    "submit-a-new-restroom": "Submit a New Restroom",
+    "about": "About",
+    "contact": "Contact",
+    "resources": "Resources",
+    "signs": "Restroom Signs",
+    "api": "Public API",
+    "toggle-navigation-button-label": "Toggle Navigation"
+  },
+  "search": {
+    "placeholder": "Search by location...",
+    "aria-label": "Search for restrooms",
+    "submit": "Search",
+    "use-location": "Use current location",
+    "geolocation-not-supported": "Geolocation is not supported by your browser",
+    "geolocation-error": "Error getting your location. Please try again or search manually."
+  },
+  "footer": {
+    "aria-labels": {
+      "github": "GitHub",
+      "twitter": "Twitter",
+      "facebook": "Facebook",
+      "email": "Email"
+    },
+    "refuge-restrooms-is-open-source": "REFUGE Restrooms is open source.",
+    "code-on-github": "Find our code on GitHub",
+    "contribute-to-the-project": "Contribute to the project",
+    "on-patreon": "on Patreon",
+    "copyleft": "Copyleft",
+    "refuge-restrooms": "REFUGE Restrooms"
+  },
+  "home": {
+    "find-refuge": "Find A Restroom",
+    "life-is-tough": "Navigating life gets easier when you know where to find a restroom.",
+    "add-restroom-button-label": "Add A Restroom",
+    "html-alt-attributes": {
+      "app-store": "Download on the App Store",
+      "play-store": "Get it on Google Play",
+      "patreon": "Support us on Patreon"
+    }
+  },
+  "restrooms": {
+    "filters": "Filters",
+    "list-view": "List View",
+    "map-view": "Map View",
+    "no-results": "No restrooms found matching your criteria.",
+    "search-results": "Found {{count}} results for \"{{term}}\"",
+    "nearby-results": "Found {{count}} restrooms near your location",
+    "all-results": "Showing {{count}} restrooms"
+  },
+  "restroom": {
+    "accessible": "Accessible",
+    "not_accessible": "Not Accessible",
+    "changing_table": "Changing Table",
+    "no_changing_table": "No Changing Table",
+    "type": {
+      "unisex": "Unisex",
+      "single_stall": "Single Stall"
+    },
+    "directions": "Directions",
+    "directions_hint": "How to find this restroom, e.g., 'In the back of the store next to the frozen foods.'",
+    "comments": "Comments",
+    "comments_hint": "Additional information about this restroom, e.g., 'Requires a code, ask at the register first.'",
+    "add_new": "Add a New Restroom",
+    "edit": {
+      "title": "Edit Restroom",
+      "editlisting": "Edit this listing",
+      "submit": "Submit Edit"
+    },
+    "preview": "Preview Location",
+    "required": "Required fields are marked with *",
+    "guess_location": "Detect my current location",
+    "location": "Location",
+    "form": {
+      "name": "Name or Business",
+      "street": "Street Address",
+      "city": "City",
+      "state": "State/Province",
+      "country": "Country",
+      "coordinates": "Coordinates",
+      "latitude": "Latitude",
+      "longitude": "Longitude",
+      "features": "Features",
+      "directions": "Directions",
+      "comments": "Comments",
+      "additional-info": "Additional Information"
+    },
+    "rating": {
+      "title": "Rating",
+      "unrated": "This restroom has not been rated yet.",
+      "positive": "{{percentage}}% positive",
+      "neutral": "{{percentage}}% neutral",
+      "negative": "{{percentage}}% negative",
+      "based-on": "Based on {{count}} ratings",
+      "level": {
+        "green": "Highly Rated",
+        "yellow": "Average",
+        "red": "Poorly Rated"
+      }
+    },
+    "upvote": "Thumbs Up",
+    "downvote": "Thumbs Down",
+    "report-issue": "Report an Issue",
+    "get-directions": "Get Directions",
+    "location-detected": "Location detected successfully",
+    "geocoding-success": "Address geocoded successfully",
+    "geocoding-partial": "We got your coordinates but couldn't determine your full address. Please fill in any missing fields.",
+    "geocoding-failed": "Could not geocode this address. Please try again or enter coordinates manually.",
+    "geocoding-error": "Error during geocoding. Please try again later.",
+    "missing-required-fields": "Please fill in all required fields",
+    "recaptcha-required": "Please complete the reCAPTCHA verification",
+    "submission-error": "Error submitting restroom. Please try again later.",
+    "geolocation-not-supported": "Geolocation is not supported by your browser",
+    "geolocation-error": "Error getting your location. Please try again or enter address manually.",
+    "geocode-missing-fields": "Please fill in address fields before geocoding",
+    "community-comments": "Community Comments",
+    "comments-coming-soon": "Community comments coming soon",
+    "nearby": "Nearby Restrooms",
+    "nearby-coming-soon": "Nearby restrooms will be shown here",
+    "no-coordinates": "This restroom doesn't have coordinates",
+    "not-found": "Restroom not found",
+    "load-error": "Error loading restroom information",
+    "submitting": "Submitting restroom...",
+    "loading-edit": "Loading restroom information for editing...",
+    "added-on": "Added on {{date}}",
+    "restsubmit": "Submit Restroom",
+    "detect-location": "Detect Location",
+    "feedback": {
+      "upvote-success": "Thank you for your positive feedback!",
+      "downvote-success": "Thank you for your feedback. We're sorry this restroom didn't meet expectations.",
+      "vote-error": "Error submitting your vote. Please try again later."
+    },
+    "flash": {
+      "new": "{{name}} created successfully!",
+      "edit": "Your edits to {{name}} have been submitted for review.",
+      "updated": "Restroom updated successfully!",
+      "field": "Please fill out all required fields",
+      "unexpected": "An unexpected error occurred",
+      "spam": "This submission has been flagged as potential spam"
+    },
+    "distance": {
+      "miles": "mi",
+      "kilometers": "km"
+    }
+  },
+  "map": {
+    "api-key-error": "Error fetching Google Maps API key",
+    "api-key-missing": "Google Maps API key is not configured"
+  },
+  "contact": {
+    "contact-title": "Contact Us",
+    "request-edit-for-restroom": "Request Edit for {{restroomName}}",
+    "missing-required-fields": "Please fill in all required fields",
+    "invalid-email": "Please enter a valid email address",
+    "recaptcha-required": "Please complete the reCAPTCHA verification",
+    "recaptcha-failed": "reCAPTCHA verification failed",
+    "submission-error": "Error submitting your message. Please try again later.",
+    "thank-you": "Thank You!",
+    "we-will-get-back-to-you": "We'll get back to you as soon as possible.",
+    "back-to-home": "Back to Home",
+    "form": {
+      "name": "Your Name",
+      "email": "Your Email",
+      "message": "Message",
+      "leave-this-field-blank": "Leave this field blank"
+    },
+    "sending": "Sending...",
+    "send": "Send Message"
+  },
+  "about": {
+    "title": "About REFUGE",
+    "contribute": "Contribute on GitHub",
+    "p1header": "What is REFUGE?",
+    "p1": {
+      "first": "REFUGE is a web application that seeks to provide safe restroom access for transgender, intersex, and gender nonconforming individuals.",
+      "second": "When the Safe2Pee website passed out of functionality in 2012, it left a hole in our ability to find a bathroom in which we weren't going to be harassed or worse. REFUGE picks up where SAFE2PEE left off, allowing individuals to find and add safe restroom locations."
+    },
+    "p2header": "Where's the data from?",
+    "p2": "The first 4500 entries are from the old Safe2Pee database. The rest are community-sourced. If you don't see a restroom in your area, add it! The more restrooms the better.",
+    "p3header": "What's the point?",
+    "p3": "We believe that everyone should have access to a safe restroom, free from gender restrictions or harassment. The transgender, intersex, and gender nonconforming communities are especially affected by this lack of access, and we'd like to change that.",
+    "p4header": "What are the levels of privacy built into this application?",
+    "p4": "Our key concern is safety. REFUGE is a crowdsourced platform, which means we rely on users like you to keep it accurate and up-to-date. We emphasize community oversight rather than government/authority regulation to prevent harm. Please report any safety concerns using the Contact form."
+  }
+}
