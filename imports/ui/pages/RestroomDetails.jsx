@@ -29,7 +29,6 @@ import { useTranslation } from 'react-i18next';
 import { get } from 'lodash';
 
 import MainLayout from '../layouts/MainLayout';
-// import TestMap from '../components/TestMap';
 import LocationMap from '../components/LocationMap';
 
 // Rating colors based on percentage
@@ -39,30 +38,83 @@ const getRatingColor = (percentage) => {
   return '#f44336'; // Red
 };
 
-// Safely get coordinates in the expected format
-const getCoordinates = (restroom) => {
-    // Check for GeoJSON format first
-    if (restroom.position && 
-        restroom.position.type === 'Point' && 
-        Array.isArray(restroom.position.coordinates) && 
-        restroom.position.coordinates.length === 2) {
-      // GeoJSON stores as [longitude, latitude]
-      return {
-        latitude: restroom.position.coordinates[1],
-        longitude: restroom.position.coordinates[0]
-      };
+// Helper to safely extract data from both FHIR and legacy formats
+const getRestroomData = (restroom) => {
+  // Check if this is FHIR format
+  if (get(restroom, 'resourceType') === 'Location') {
+    // Extract from FHIR Location resource
+    const accessibility = restroom.getAccessibilityFeatures ? restroom.getAccessibilityFeatures() : {};
+    const rating = restroom.getRating ? restroom.getRating() : { upvotes: 0, downvotes: 0, percentage: 0, isRated: false };
+    const address = restroom.getAddress ? restroom.getAddress() : {};
+    const position = restroom.getPosition ? restroom.getPosition() : {};
+    const facilityDetails = restroom.getFacilityDetails ? restroom.getFacilityDetails() : {};
+    const timestamps = restroom.getTimestamps ? restroom.getTimestamps() : {};
+    
+    return {
+      _id: get(restroom, 'id'),
+      name: get(restroom, 'name', 'Unnamed Restroom'),
+      street: get(address, 'street', ''),
+      city: get(address, 'city', ''),
+      state: get(address, 'state', ''),
+      country: get(address, 'country', 'United States'),
+      accessible: get(accessibility, 'accessible', false),
+      unisex: get(accessibility, 'unisex', false),
+      changing_table: get(accessibility, 'changingTable', false),
+      directions: get(facilityDetails, 'directions', ''),
+      comment: get(facilityDetails, 'comments', ''),
+      upvote: get(rating, 'upvotes', 0),
+      downvote: get(rating, 'downvotes', 0),
+      ratingPercentage: get(rating, 'percentage', 0),
+      isRated: get(rating, 'isRated', false),
+      latitude: get(position, 'latitude'),
+      longitude: get(position, 'longitude'),
+      createdAt: get(timestamps, 'createdAt') || get(restroom, 'meta.lastUpdated'),
+      updatedAt: get(timestamps, 'updatedAt') || get(restroom, 'meta.lastUpdated')
+    };
+  } else {
+    // Legacy format - extract directly
+    const upvotes = get(restroom, 'upvote', 0);
+    const downvotes = get(restroom, 'downvote', 0);
+    const total = upvotes + downvotes;
+    const ratingPercentage = total > 0 ? (upvotes / total) * 100 : 0;
+    
+    // Handle coordinates from different formats
+    let latitude, longitude;
+    
+    // Try GeoJSON format first
+    const geoCoords = get(restroom, 'position.coordinates');
+    if (geoCoords && Array.isArray(geoCoords) && geoCoords.length === 2) {
+      longitude = geoCoords[0];
+      latitude = geoCoords[1];
+    } else {
+      // Fallback to direct properties
+      latitude = get(restroom, 'latitude');
+      longitude = get(restroom, 'longitude');
     }
     
-    // Fallback to regular lat/lng fields if they exist
-    if (typeof restroom.latitude === 'number' && typeof restroom.longitude === 'number') {
-      return {
-        latitude: restroom.latitude,
-        longitude: restroom.longitude
-      };
-    }
-    
-    return null;
-  };
+    return {
+      _id: get(restroom, '_id'),
+      name: get(restroom, 'name', 'Unnamed Restroom'),
+      street: get(restroom, 'street', ''),
+      city: get(restroom, 'city', ''),
+      state: get(restroom, 'state', ''),
+      country: get(restroom, 'country', 'United States'),
+      accessible: get(restroom, 'accessible', false),
+      unisex: get(restroom, 'unisex', false),
+      changing_table: get(restroom, 'changing_table', false),
+      directions: get(restroom, 'directions', ''),
+      comment: get(restroom, 'comment', ''),
+      upvote: upvotes,
+      downvote: downvotes,
+      ratingPercentage,
+      isRated: total > 0,
+      latitude,
+      longitude,
+      createdAt: get(restroom, 'createdAt'),
+      updatedAt: get(restroom, 'updatedAt')
+    };
+  }
+};
 
 const RestroomDetails = () => {
   const { t } = useTranslation();
@@ -72,46 +124,53 @@ const RestroomDetails = () => {
   const [error, setError] = useState(null);
   const [voteSuccess, setVoteSuccess] = useState(null);
   
-  // Fetch restroom data
+  // Fetch restroom data using FHIR methods
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Use direct method call instead of subscription
-        const result = await Meteor.callAsync('restrooms.getById', id);
+        // Try FHIR method first, with legacy format return for compatibility
+        const result = await Meteor.callAsync('fhir.locations.getById', id, {
+          returnLegacyFormat: false // Get FHIR format to use helper methods
+        });
         setRestroom(result);
         setLoading(false);
-        console.log('Fetched restroom:', result);
+        console.log('Fetched FHIR restroom:', result);
       } catch (err) {
-        console.error('Error fetching restroom:', err);
-        setError(err.message || 'Failed to load restroom data');
-        setLoading(false);
+        // Fallback to legacy method if FHIR fails
+        console.warn('FHIR method failed, trying legacy:', err);
+        try {
+          const legacyResult = await Meteor.callAsync('restrooms.getById', id);
+          setRestroom(legacyResult);
+          setLoading(false);
+          console.log('Fetched legacy restroom:', legacyResult);
+        } catch (legacyErr) {
+          console.error('Both FHIR and legacy methods failed:', legacyErr);
+          setError(legacyErr.message || 'Failed to load restroom data');
+          setLoading(false);
+        }
       }
     };
     
     fetchData();
   }, [id]);
   
-  // Handle voting
+  // Handle voting using FHIR methods
   const handleVote = async (isUpvote) => {
     try {
       if (isUpvote) {
-        await Meteor.callAsync('restrooms.upvote', id);
-        // Optimistically update the UI
-        setRestroom({
-          ...restroom,
-          upvote: get(restroom, 'upvote', 0) + 1
-        });
+        await Meteor.callAsync('fhir.locations.upvote', id);
         setVoteSuccess(t('restroom.feedback.upvote-success'));
       } else {
-        await Meteor.callAsync('restrooms.downvote', id);
-        // Optimistically update the UI
-        setRestroom({
-          ...restroom,
-          downvote: get(restroom, 'downvote', 0) + 1
-        });
+        await Meteor.callAsync('fhir.locations.downvote', id);
         setVoteSuccess(t('restroom.feedback.downvote-success'));
       }
+      
+      // Refresh the data to show updated vote counts
+      const updatedRestroom = await Meteor.callAsync('fhir.locations.getById', id, {
+        returnLegacyFormat: false
+      });
+      setRestroom(updatedRestroom);
       
       // Clear success message after 3 seconds
       setTimeout(() => {
@@ -156,29 +215,10 @@ const RestroomDetails = () => {
     );
   }
   
-  // Calculate rating data safely using lodash get
-  const upvotes = get(restroom, 'upvote', 0);
-  const downvotes = get(restroom, 'downvote', 0);
-  const isRated = upvotes > 0 || downvotes > 0;
-  const ratingPercentage = isRated 
-    ? (upvotes / (upvotes + downvotes)) * 100 
-    : 0;
-  const ratingColor = isRated ? getRatingColor(ratingPercentage) : '#9e9e9e';
+  // Extract data using our helper
+  const data = getRestroomData(restroom);
   
-  // Safely get restroom properties with default values
-  const name = get(restroom, 'name', '');
-  const street = get(restroom, 'street', '');
-  const city = get(restroom, 'city', '');
-  const state = get(restroom, 'state', '');
-  const country = get(restroom, 'country', 'United States');
-  const directions = get(restroom, 'directions', '');
-  const comment = get(restroom, 'comment', '');
-  const latitude = get(restroom, 'latitude');
-  const longitude = get(restroom, 'longitude');
-  const unisex = get(restroom, 'unisex', false);
-  const accessible = get(restroom, 'accessible', false);
-  const changingTable = get(restroom, 'changing_table', false);
-  const createdAt = get(restroom, 'createdAt', new Date());
+  const ratingColor = data.isRated ? getRatingColor(data.ratingPercentage) : '#9e9e9e';
   
   return (
     <MainLayout>
@@ -206,15 +246,16 @@ const RestroomDetails = () => {
           <Grid item xs={12} md={8}>
             <Paper sx={{ p: 3, mb: 3 }}>
               <Typography variant="h4" component="h1" gutterBottom>
-                {name}
+                {data.name}
               </Typography>
               
               <Typography variant="h6" color="text.secondary" gutterBottom>
-                {`${street}, ${city}, ${state}, ${country}`}
+                {`${data.street}, ${data.city}, ${data.state}`}
+                {data.country !== 'United States' && `, ${data.country}`}
               </Typography>
               
               <Stack direction="row" spacing={1} sx={{ mt: 2, mb: 3 }}>
-                {unisex && (
+                {data.unisex && (
                   <Chip 
                     icon={<WcIcon />} 
                     label={t('restroom.type.unisex')}
@@ -222,7 +263,7 @@ const RestroomDetails = () => {
                   />
                 )}
                 
-                {accessible && (
+                {data.accessible && (
                   <Chip 
                     icon={<AccessibleIcon />} 
                     label={t('restroom.accessible')}
@@ -230,7 +271,7 @@ const RestroomDetails = () => {
                   />
                 )}
                 
-                {changingTable && (
+                {data.changing_table && (
                   <Chip 
                     icon={<ChildCareIcon />} 
                     label={t('restroom.changing_table')}
@@ -250,7 +291,7 @@ const RestroomDetails = () => {
                     startIcon={<ThumbUpIcon />}
                     onClick={() => handleVote(true)}
                   >
-                    {t('restroom.upvote')} ({upvotes})
+                    {t('restroom.upvote')} ({data.upvote})
                   </Button>
                   
                   <Button
@@ -259,7 +300,7 @@ const RestroomDetails = () => {
                     startIcon={<ThumbDownIcon />}
                     onClick={() => handleVote(false)}
                   >
-                    {t('restroom.downvote')} ({downvotes})
+                    {t('restroom.downvote')} ({data.downvote})
                   </Button>
                 </Stack>
                 
@@ -268,7 +309,7 @@ const RestroomDetails = () => {
                     variant="outlined"
                     startIcon={<EditIcon />}
                     component={RouterLink}
-                    to={`/restrooms/${id}/edit`}
+                    to={`/restrooms/${data._id}/edit`}
                   >
                     {t('restroom.edit.submit')}
                   </Button>
@@ -277,7 +318,7 @@ const RestroomDetails = () => {
                     variant="outlined"
                     startIcon={<ReportIcon />}
                     component={RouterLink}
-                    to={`/contact?restroom_id=${id}&restroom_name=${encodeURIComponent(name)}`}
+                    to={`/contact?restroom_id=${data._id}&restroom_name=${encodeURIComponent(data.name)}`}
                   >
                     {t('restroom.report-issue')}
                   </Button>
@@ -285,28 +326,28 @@ const RestroomDetails = () => {
               </Box>
               
               {/* Directions and Comments */}
-              {(directions || comment) && (
+              {(data.directions || data.comment) && (
                 <Box sx={{ mb: 3 }}>
-                  {directions && (
+                  {data.directions && (
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                         <DirectionsIcon sx={{ mr: 1 }} />
                         {t('restroom.directions')}
                       </Typography>
                       <Typography variant="body1" paragraph>
-                        {directions}
+                        {data.directions}
                       </Typography>
                     </Box>
                   )}
                   
-                  {comment && (
+                  {data.comment && (
                     <Box>
                       <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                         <CommentIcon sx={{ mr: 1 }} />
                         {t('restroom.comments')}
                       </Typography>
                       <Typography variant="body1" paragraph>
-                        {comment}
+                        {data.comment}
                       </Typography>
                     </Box>
                   )}
@@ -314,11 +355,13 @@ const RestroomDetails = () => {
               )}
               
               {/* Added Date */}
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="body2" color="text.secondary">
-                  {t('restroom.added-on', { date: new Date(createdAt).toLocaleDateString() })}
-                </Typography>
-              </Box>
+              {data.createdAt && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    {t('restroom.added-on', { date: new Date(data.createdAt).toLocaleDateString() })}
+                  </Typography>
+                </Box>
+              )}
             </Paper>
             
             {/* Rating Card */}
@@ -327,11 +370,11 @@ const RestroomDetails = () => {
                 {t('restroom.rating.title')}
               </Typography>
               
-              {isRated ? (
+              {data.isRated ? (
                 <Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                     <Typography variant="body1" sx={{ mr: 1 }}>
-                      {Math.round(ratingPercentage)}% {t('restroom.rating.positive', { percentage: Math.round(ratingPercentage) })}
+                      {Math.round(data.ratingPercentage)}% {t('restroom.rating.positive', { percentage: Math.round(data.ratingPercentage) })}
                     </Typography>
                     <Typography 
                       variant="body2" 
@@ -343,15 +386,15 @@ const RestroomDetails = () => {
                         borderRadius: 1 
                       }}
                     >
-                      {ratingPercentage > 70 ? t('restroom.rating.level.green') : 
-                       ratingPercentage > 50 ? t('restroom.rating.level.yellow') :
+                      {data.ratingPercentage > 70 ? t('restroom.rating.level.green') : 
+                       data.ratingPercentage > 50 ? t('restroom.rating.level.yellow') :
                                              t('restroom.rating.level.red')}
                     </Typography>
                   </Box>
                   
                   <LinearProgress
                     variant="determinate"
-                    value={ratingPercentage}
+                    value={data.ratingPercentage}
                     sx={{
                       height: 10,
                       borderRadius: 5,
@@ -365,7 +408,7 @@ const RestroomDetails = () => {
                   />
                   
                   <Typography variant="body2" color="text.secondary">
-                    {t('restroom.rating.based-on', { count: upvotes + downvotes })}
+                    {t('restroom.rating.based-on', { count: data.upvote + data.downvote })}
                   </Typography>
                 </Box>
               ) : (
@@ -379,49 +422,40 @@ const RestroomDetails = () => {
           {/* Map and Location */}
           <Grid item xs={12} md={4}>
             <Paper sx={{ p: 2, mb: 3 }}>
-                <Typography variant="h6" gutterBottom>
+              <Typography variant="h6" gutterBottom>
                 {t('restroom.location')}
-                </Typography>
-                
-                <Box sx={{ height: 300, mb: 2 }}>
-                {(() => {
-                    // Get coordinates with GeoJSON support
-                    const coords = getCoordinates(restroom);
-                    
-                    if (coords) {
-                    return (
-                        <LocationMap
-                        latitude={coords.latitude}
-                        longitude={coords.longitude}
-                        name={name}
-                        height={300}
-                        />
-                    );
-                    } else {
-                    return (
-                        <Alert severity="info" sx={{ height: '100%' }}>
-                        {t('restroom.no-coordinates')}
-                        </Alert>
-                    );
-                    }
-                })()}
-                </Box>
-                
-                <Button
+              </Typography>
+              
+              <Box sx={{ height: 300, mb: 2 }}>
+                {data.latitude && data.longitude ? (
+                  <LocationMap
+                    latitude={data.latitude}
+                    longitude={data.longitude}
+                    name={data.name}
+                    height={300}
+                  />
+                ) : (
+                  <Alert severity="info" sx={{ height: '100%' }}>
+                    {t('restroom.no-coordinates')}
+                  </Alert>
+                )}
+              </Box>
+              
+              <Button
                 variant="outlined"
                 fullWidth
                 startIcon={<DirectionsIcon />}
                 component="a"
                 href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
-                    `${street}, ${city}, ${state}, ${country}`
+                  `${data.street}, ${data.city}, ${data.state}, ${data.country}`
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                >
+              >
                 {t('restroom.get-directions')}
-                </Button>
+              </Button>
             </Paper>
-            </Grid>
+          </Grid>
         </Grid>
       </Container>
     </MainLayout>

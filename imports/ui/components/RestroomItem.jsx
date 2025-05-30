@@ -16,6 +16,7 @@ import AccessibleIcon from '@mui/icons-material/Accessible';
 import WcIcon from '@mui/icons-material/Wc';
 import ChildCareIcon from '@mui/icons-material/ChildCare';
 import { useTranslation } from 'react-i18next';
+import { get } from 'lodash';
 
 // Rating colors based on percentage
 const getRatingColor = (percentage) => {
@@ -36,6 +37,57 @@ const milesToKilometers = (miles) => {
   return miles * 1.609344;
 };
 
+// Helper to safely extract data from both FHIR and legacy formats
+const getRestroomData = (restroom) => {
+  // Check if this is FHIR format
+  if (get(restroom, 'resourceType') === 'Location') {
+    // Extract from FHIR Location resource using helper methods
+    const accessibility = restroom.getAccessibilityFeatures ? restroom.getAccessibilityFeatures() : {};
+    const rating = restroom.getRating ? restroom.getRating() : { upvotes: 0, downvotes: 0, percentage: 0, isRated: false };
+    const address = restroom.getAddress ? restroom.getAddress() : {};
+    
+    return {
+      _id: get(restroom, 'id'),
+      name: get(restroom, 'name', 'Unnamed Restroom'),
+      street: get(address, 'street', ''),
+      city: get(address, 'city', ''),
+      state: get(address, 'state', ''),
+      country: get(address, 'country', 'United States'),
+      accessible: get(accessibility, 'accessible', false),
+      unisex: get(accessibility, 'unisex', false),
+      changing_table: get(accessibility, 'changingTable', false),
+      upvote: get(rating, 'upvotes', 0),
+      downvote: get(rating, 'downvotes', 0),
+      ratingPercentage: get(rating, 'percentage', 0),
+      isRated: get(rating, 'isRated', false),
+      distance: get(restroom, 'distance') // Distance may be added by search methods
+    };
+  } else {
+    // Legacy format - extract directly
+    const upvotes = get(restroom, 'upvote', 0);
+    const downvotes = get(restroom, 'downvote', 0);
+    const total = upvotes + downvotes;
+    const ratingPercentage = total > 0 ? (upvotes / total) * 100 : 0;
+    
+    return {
+      _id: get(restroom, '_id'),
+      name: get(restroom, 'name', 'Unnamed Restroom'),
+      street: get(restroom, 'street', ''),
+      city: get(restroom, 'city', ''),
+      state: get(restroom, 'state', ''),
+      country: get(restroom, 'country', 'United States'),
+      accessible: get(restroom, 'accessible', false),
+      unisex: get(restroom, 'unisex', false),
+      changing_table: get(restroom, 'changing_table', false),
+      upvote: upvotes,
+      downvote: downvotes,
+      ratingPercentage,
+      isRated: total > 0,
+      distance: get(restroom, 'distance')
+    };
+  }
+};
+
 const RestroomItem = ({ restroom, showDistance = false }) => {
   const { t } = useTranslation();
   
@@ -43,15 +95,12 @@ const RestroomItem = ({ restroom, showDistance = false }) => {
     return null;
   }
   
-  // Check if restroom has been rated
-  const isRated = (restroom.upvote > 0 || restroom.downvote > 0);
-  const ratingPercentage = isRated 
-    ? (restroom.upvote / (restroom.upvote + restroom.downvote)) * 100 
-    : 0;
+  // Extract data using our helper
+  const data = getRestroomData(restroom);
   
-  const ratingColor = isRated ? getRatingColor(ratingPercentage) : '#9e9e9e';
-  const ratingLabel = isRated 
-    ? getRatingLabel(ratingPercentage, t) 
+  const ratingColor = data.isRated ? getRatingColor(data.ratingPercentage) : '#9e9e9e';
+  const ratingLabel = data.isRated 
+    ? getRatingLabel(data.ratingPercentage, t) 
     : t('restroom.rating.unrated');
   
   return (
@@ -68,16 +117,17 @@ const RestroomItem = ({ restroom, showDistance = false }) => {
       <CardContent>
         <Typography 
           component={RouterLink} 
-          to={`/restrooms/${restroom._id}`} 
+          to={`/restrooms/${data._id}`} 
           variant="h6" 
           color="primary"
           sx={{ textDecoration: 'none', display: 'block', mb: 1 }}
         >
-          {restroom.name}
+          {data.name}
         </Typography>
         
         <Typography variant="body2" color="text.secondary" gutterBottom>
-          {`${restroom.street}, ${restroom.city}, ${restroom.state}`}
+          {`${data.street}, ${data.city}, ${data.state}`}
+          {data.country !== 'United States' && `, ${data.country}`}
         </Typography>
         
         <Stack
@@ -85,7 +135,7 @@ const RestroomItem = ({ restroom, showDistance = false }) => {
           spacing={1}
           sx={{ my: 2 }}
         >
-          {restroom.unisex && (
+          {data.unisex && (
             <Chip 
               icon={<WcIcon />} 
               label={t('restroom.type.unisex')} 
@@ -95,7 +145,7 @@ const RestroomItem = ({ restroom, showDistance = false }) => {
             />
           )}
           
-          {restroom.accessible && (
+          {data.accessible && (
             <Chip 
               icon={<AccessibleIcon />} 
               label={t('restroom.accessible')} 
@@ -105,7 +155,7 @@ const RestroomItem = ({ restroom, showDistance = false }) => {
             />
           )}
           
-          {restroom.changing_table && (
+          {data.changing_table && (
             <Chip 
               icon={<ChildCareIcon />} 
               label={t('restroom.changing_table')} 
@@ -119,13 +169,13 @@ const RestroomItem = ({ restroom, showDistance = false }) => {
         <Divider sx={{ my: 1 }} />
         
         <Box sx={{ display: 'flex', alignItems: 'center', mt: 2 }}>
-          <Box sx={{ width: '70%', mr: 1 }}>
+          <Box sx={{ width: showDistance && data.distance ? '60%' : '70%', mr: 1 }}>
             <Typography variant="body2" color="text.secondary">
               {ratingLabel}
             </Typography>
             <LinearProgress
               variant="determinate"
-              value={isRated ? ratingPercentage : 0}
+              value={data.isRated ? data.ratingPercentage : 0}
               sx={{
                 height: 8,
                 borderRadius: 5,
@@ -136,13 +186,20 @@ const RestroomItem = ({ restroom, showDistance = false }) => {
                 }
               }}
             />
+            {data.isRated && (
+              <Typography variant="caption" color="text.secondary">
+                {t('restroom.rating.based-on', { count: data.upvote + data.downvote })}
+              </Typography>
+            )}
           </Box>
           
-          {showDistance && restroom.distance && (
+          {showDistance && data.distance !== null && data.distance !== undefined && (
             <Box sx={{ ml: 'auto', textAlign: 'right' }}>
               <Typography variant="body2" color="text.secondary">
-                {restroom.distance.toFixed(2)} {t('restroom.distance.miles')} /
-                {' '}{milesToKilometers(restroom.distance).toFixed(2)} {t('restroom.distance.kilometers')}
+                {data.distance.toFixed(2)} mi
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {milesToKilometers(data.distance).toFixed(2)} km
               </Typography>
             </Box>
           )}

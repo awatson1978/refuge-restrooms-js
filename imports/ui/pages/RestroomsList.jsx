@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Meteor } from 'meteor/meteor';
-import { useTracker } from 'meteor/react-meteor-data';
 import { 
   Box, 
   Container, 
@@ -26,13 +25,13 @@ import AccessibleIcon from '@mui/icons-material/Accessible';
 import WcIcon from '@mui/icons-material/Wc';
 import ChildCareIcon from '@mui/icons-material/ChildCare';
 import { useTranslation } from 'react-i18next';
+import { get } from 'lodash';
 
 import MainLayout from '../layouts/MainLayout';
 import RestroomItem from '../components/RestroomItem';
 import Map from '../components/Map';
-import TestMap from '../components/TestMap'; // Import the test map for debugging
+import TestMap from '../components/TestMap';
 import Search from '../components/Search';
-import { Restrooms } from '../../api/restrooms';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -47,35 +46,28 @@ const RestroomsList = () => {
   const query = useQuery();
   const location = useLocation();
   
-    // Get query parameters
-    const searchParam = query.get('search');
-    const latParam = query.get('lat');
-    const lngParam = query.get('lng');
-    const viewParam = query.get('view') || 'list';
-    const pageParam = parseInt(query.get('page') || '1', 10);
+  // Get query parameters
+  const searchParam = query.get('search');
+  const latParam = query.get('lat');
+  const lngParam = query.get('lng');
+  const viewParam = query.get('view') || 'list';
+  const pageParam = parseInt(query.get('page') || '1', 10);
 
-    // Convert lat/lng to numbers
-    const latitude = latParam ? parseFloat(latParam) : null;
-    const longitude = lngParam ? parseFloat(lngParam) : null;
-    const hasValidCoordinates = 
+  // Convert lat/lng to numbers
+  const latitude = latParam ? parseFloat(latParam) : null;
+  const longitude = lngParam ? parseFloat(lngParam) : null;
+  const hasValidCoordinates = 
     latitude !== null && 
     longitude !== null && 
     !isNaN(latitude) && 
     !isNaN(longitude);
 
-    // Set map center if coordinates are valid
-    const [mapCenter, setMapCenter] = useState(
+  // Set map center if coordinates are valid
+  const [mapCenter, setMapCenter] = useState(
     hasValidCoordinates
-        ? { lat: latitude, lng: longitude }
-        : null
-    );
-  
-  // Debug state
-  const [debug, setDebug] = useState({
-    loadAttempts: 0,
-    subscription: 'pending',
-    error: null
-  });
+      ? { lat: latitude, lng: longitude }
+      : null
+  );
   
   // Local state
   const [view, setView] = useState(viewParam);
@@ -87,89 +79,156 @@ const RestroomsList = () => {
     changing_table: query.get('changing_table') === 'true'
   });
 
-  
-  // Direct data access (no subscription)
-  const [directData, setDirectData] = useState({
+  // Data state using FHIR methods
+  const [data, setData] = useState({
     loading: true,
     restrooms: [],
     count: 0,
     error: null
   });
   
-  // Load data directly using Method
+  // Load data using FHIR methods
   useEffect(() => {
     const loadData = async () => {
-      setDirectData(prev => ({ ...prev, loading: true }));
+      setData(prev => ({ ...prev, loading: true, error: null }));
       
       try {
         console.log('Loading restrooms data with parameters:', { 
           searchParam, 
           hasCoords: hasValidCoordinates,
           lat: latitude, 
-          lng: longitude 
+          lng: longitude,
+          filters
         });
         
-        // If we have valid coordinates, use location-based search
+        let results;
+        
+        // Route to appropriate FHIR method based on search type
         if (hasValidCoordinates) {
-          console.log(`Calling restrooms.searchByLocation with lat=${latitude}, lng=${longitude}`);
-          const results = await Meteor.callAsync('restrooms.searchByLocation', latitude, longitude, {
+          console.log(`Calling FHIR location search with lat=${latitude}, lng=${longitude}`);
+          results = await Meteor.callAsync('fhir.locations.searchByLocation', latitude, longitude, {
             limit: ITEMS_PER_PAGE,
-            skip: (page - 1) * ITEMS_PER_PAGE
+            skip: (page - 1) * ITEMS_PER_PAGE,
+            returnLegacyFormat: true // For UI compatibility
           });
           
-          console.log('Location search results:', {
+          console.log('FHIR location search results:', {
             count: results.length,
-            firstResult: results[0] ? results[0].name : 'none'
+            firstResult: results[0] ? get(results[0], 'name') : 'none'
           });
           
-          setDirectData({
+          setData({
             loading: false,
             restrooms: results,
             count: results.length,
             error: null
           });
-        } 
-        // Otherwise, use text search or default fetch
-        else if (searchParam) {
-          console.log(`Calling restrooms.search with query="${searchParam}"`);
-          const results = await Meteor.callAsync('restrooms.search', searchParam, {
+          
+        } else if (searchParam) {
+          console.log(`Calling FHIR text search with query="${searchParam}"`);
+          results = await Meteor.callAsync('fhir.locations.searchByText', searchParam, {
             limit: ITEMS_PER_PAGE,
-            skip: (page - 1) * ITEMS_PER_PAGE
+            skip: (page - 1) * ITEMS_PER_PAGE,
+            returnLegacyFormat: true
           });
           
-          setDirectData({
+          console.log('FHIR text search results:', {
+            count: results.length,
+            firstResult: results[0] ? get(results[0], 'name') : 'none'
+          });
+          
+          setData({
             loading: false,
             restrooms: results,
             count: results.length,
             error: null
           });
-        } 
-        // Default fetch
-        else {
-          console.log('Calling restroomsDirectFetch method');
-          const result = await Meteor.callAsync('restroomsDirectFetch', {
+          
+        } else {
+          // Default fetch with filters
+          console.log('Calling FHIR getAll with filters:', filters);
+          const result = await Meteor.callAsync('fhir.locations.getAll', {
             limit: ITEMS_PER_PAGE,
             skip: (page - 1) * ITEMS_PER_PAGE,
             accessible: filters.accessible,
             unisex: filters.unisex,
-            changing_table: filters.changing_table
+            changing_table: filters.changing_table,
+            returnLegacyFormat: true
           });
           
-          setDirectData({
+          console.log('FHIR getAll results:', {
+            locations: get(result, 'locations.length', 0),
+            totalCount: get(result, 'count', 0)
+          });
+          
+          setData({
             loading: false,
-            restrooms: result.restrooms,
-            count: result.count,
+            restrooms: get(result, 'locations', []),
+            count: get(result, 'count', 0),
             error: null
           });
         }
+        
       } catch (err) {
-        console.error('Error fetching restrooms data:', err);
-        setDirectData({
-          loading: false,
-          restrooms: [],
-          count: 0,
-          error: err.message
-        });
+        console.error('Error fetching FHIR restrooms data:', err);
+        
+        // Fallback to legacy methods if FHIR fails
+        console.warn('FHIR methods failed, attempting legacy fallback...');
+        try {
+          let fallbackResults;
+          
+          if (hasValidCoordinates) {
+            fallbackResults = await Meteor.callAsync('restrooms.searchByLocation', latitude, longitude, {
+              limit: ITEMS_PER_PAGE,
+              skip: (page - 1) * ITEMS_PER_PAGE
+            });
+            
+            setData({
+              loading: false,
+              restrooms: fallbackResults,
+              count: fallbackResults.length,
+              error: null
+            });
+          } else if (searchParam) {
+            fallbackResults = await Meteor.callAsync('restrooms.search', searchParam, {
+              limit: ITEMS_PER_PAGE,
+              skip: (page - 1) * ITEMS_PER_PAGE
+            });
+            
+            setData({
+              loading: false,
+              restrooms: fallbackResults,
+              count: fallbackResults.length,
+              error: null
+            });
+          } else {
+            const fallbackResult = await Meteor.callAsync('restroomsDirectFetch', {
+              limit: ITEMS_PER_PAGE,
+              skip: (page - 1) * ITEMS_PER_PAGE,
+              accessible: filters.accessible,
+              unisex: filters.unisex,
+              changing_table: filters.changing_table
+            });
+            
+            setData({
+              loading: false,
+              restrooms: get(fallbackResult, 'restrooms', []),
+              count: get(fallbackResult, 'count', 0),
+              error: null
+            });
+          }
+          
+          console.log('Legacy fallback successful');
+          
+        } catch (legacyErr) {
+          console.error('Both FHIR and legacy methods failed:', legacyErr);
+          setData({
+            loading: false,
+            restrooms: [],
+            count: 0,
+            error: legacyErr.message || 'Failed to load restrooms data'
+          });
+        }
       }
     };
     
@@ -218,11 +277,11 @@ const RestroomsList = () => {
   
   // Handler for map marker click
   const handleMarkerClick = (restroom) => {
-    setSelectedRestroomId(restroom._id);
+    const restroomId = get(restroom, '_id') || get(restroom, 'id');
+    setSelectedRestroomId(restroomId);
   };
   
-  // Use the direct data for rendering
-  const { loading, restrooms, count, error } = directData;
+  const { loading, restrooms, count, error } = data;
   
   return (
     <MainLayout>
@@ -299,20 +358,21 @@ const RestroomsList = () => {
             </Paper>
           </Grid>
           
-          {/* Debug Information - Only in development */}
-          {/* {process.env.NODE_ENV !== 'production' && (
+          {/* Development Debug Panel */}
+          {process.env.NODE_ENV !== 'production' && (
             <Grid item xs={12}>
               <Paper sx={{ p: 2, mb: 2, bgcolor: '#f9f9f9' }}>
-                <Typography variant="subtitle2" gutterBottom>Debug Info</Typography>
+                <Typography variant="subtitle2" gutterBottom>Debug Info (Development)</Typography>
                 <Typography variant="body2" component="div">
                   <Box component="pre" sx={{ fontSize: '0.8rem' }}>
                     {JSON.stringify({ 
                       loading, 
                       restroomsCount: restrooms?.length || 0,
+                      totalCount: count,
                       view,
                       page,
                       filters,
-                      debug
+                      hasCoords: hasValidCoordinates
                     }, null, 2)}
                   </Box>
                 </Typography>
@@ -322,19 +382,19 @@ const RestroomsList = () => {
                     variant="outlined" 
                     size="small" 
                     onClick={() => {
-                      Meteor.call('test.insertRestrooms', 20, (err, res) => { 
+                      Meteor.call('test.insertFhirLocations', 20, (err, res) => { 
                         if (err) {
-                          console.error('Error inserting test data:', err);
-                          alert('Error inserting test data: ' + err.message);
+                          console.error('Error inserting FHIR test data:', err);
+                          alert('Error inserting FHIR test data: ' + err.message);
                         } else {
-                          console.log('Test data inserted:', res);
-                          alert('Added 20 test restrooms!');
+                          console.log('FHIR test data inserted:', res);
+                          alert('Added 20 test FHIR locations!');
                           window.location.reload();
                         }
                       });
                     }}
                   >
-                    Add Test Data
+                    Add FHIR Test Data
                   </Button>
                   {' '}
                   <Button 
@@ -342,24 +402,24 @@ const RestroomsList = () => {
                     size="small" 
                     color="error"
                     onClick={() => {
-                      Meteor.call('test.clearTestData', (err, res) => { 
+                      Meteor.call('test.clearFhirTestData', (err, res) => { 
                         if (err) {
-                          console.error('Error clearing test data:', err);
-                          alert('Error clearing test data: ' + err.message);
+                          console.error('Error clearing FHIR test data:', err);
+                          alert('Error clearing FHIR test data: ' + err.message);
                         } else {
-                          console.log('Test data cleared:', res);
-                          alert(`Removed ${res.count} test restrooms!`);
+                          console.log('FHIR test data cleared:', res);
+                          alert(`Removed ${res.count} test FHIR locations!`);
                           window.location.reload();
                         }
                       });
                     }}
                   >
-                    Clear Test Data
+                    Clear FHIR Test Data
                   </Button>
                 </Box>
               </Paper>
             </Grid>
-          )} */}
+          )}
           
           {/* Map View */}
           {view === 'map' && (
@@ -386,9 +446,12 @@ const RestroomsList = () => {
                     
                     {selectedRestroomId && (
                       <Box sx={{ mt: 2 }}>
-                        {restrooms.filter(r => r._id === selectedRestroomId).map(restroom => (
+                        {restrooms.filter(r => {
+                          const id = get(r, '_id') || get(r, 'id');
+                          return id === selectedRestroomId;
+                        }).map(restroom => (
                           <RestroomItem 
-                            key={restroom._id} 
+                            key={get(restroom, '_id') || get(restroom, 'id')} 
                             restroom={restroom}
                             showDistance={!!latParam && !!lngParam}
                           />
@@ -409,7 +472,7 @@ const RestroomsList = () => {
                   <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 4 }}>
                     <CircularProgress sx={{ mb: 2 }} />
                     <Typography variant="body2" color="text.secondary">
-                      Loading restrooms... (Attempt: {debug.loadAttempts})
+                      Loading restrooms using FHIR methods...
                     </Typography>
                   </Box>
                 ) : error ? (
@@ -430,16 +493,16 @@ const RestroomsList = () => {
                   <>
                     <Typography variant="h6" gutterBottom>
                       {searchParam 
-                        ? t('restrooms.search-results', { count, term: searchParam })
+                        ? t('restrooms.search-results', { count: restrooms.length, term: searchParam })
                         : latParam && lngParam
-                          ? t('restrooms.nearby-results', { count })
+                          ? t('restrooms.nearby-results', { count: restrooms.length })
                           : t('restrooms.all-results', { count: restrooms.length })}
                     </Typography>
                     
                     <Box sx={{ my: 2 }}>
                       {restrooms.map(restroom => (
                         <RestroomItem 
-                          key={restroom._id} 
+                          key={get(restroom, '_id') || get(restroom, 'id')} 
                           restroom={restroom}
                           showDistance={!!latParam && !!lngParam}
                         />
