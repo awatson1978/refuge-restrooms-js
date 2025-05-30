@@ -300,7 +300,7 @@ const RestroomsList = () => {
           </Grid>
           
           {/* Debug Information - Only in development */}
-          {process.env.NODE_ENV !== 'production' && (
+          {/* {process.env.NODE_ENV !== 'production' && (
             <Grid item xs={12}>
               <Paper sx={{ p: 2, mb: 2, bgcolor: '#f9f9f9' }}>
                 <Typography variant="subtitle2" gutterBottom>Debug Info</Typography>
@@ -317,7 +317,6 @@ const RestroomsList = () => {
                   </Box>
                 </Typography>
                 
-                {/* Debug controls */}
                 <Box sx={{ mt: 2 }}>
                   <Button 
                     variant="outlined" 
@@ -360,7 +359,7 @@ const RestroomsList = () => {
                 </Box>
               </Paper>
             </Grid>
-          )}
+          )} */}
           
           {/* Map View */}
           {view === 'map' && (

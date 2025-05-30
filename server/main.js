@@ -171,6 +171,7 @@ if (Meteor.isServer && !Meteor.server.method_handlers['geocode.address']) {
         }
         
         console.log('No Google Maps API key found');
+        console.log('Try running:  export GOOGLE_MAPS_PUBLIC_API_KEY="12345"');
         return '';
     },
     'test.insertRestrooms': function(count = 10) {
