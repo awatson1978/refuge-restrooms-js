@@ -111,24 +111,21 @@ export const FhirLocationSchema = new SimpleSchema({
     optional: true
   },
   
-  // Position using FHIR Location.position
+  // Position using FHIR Location.position - FIXED: removed decimal property
   position: {
     type: Object,
     optional: true
   },
   'position.longitude': {
     type: Number,
-    decimal: true,
     optional: true
   },
   'position.latitude': {
     type: Number,
-    decimal: true,
     optional: true
   },
   'position.altitude': {
     type: Number,
-    decimal: true,
     optional: true
   },
   

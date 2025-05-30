@@ -2,19 +2,34 @@
 import { Meteor } from 'meteor/meteor';
 import { check } from 'meteor/check';
 import { HTTP } from 'meteor/http';
-import { RateLimiter } from 'meteor/ddp-rate-limiter';
 
-// Set up rate limiter for geocoding requests
-const geocodingLimiter = new RateLimiter({
-  ruleSets: [{
-    userId: () => true,
-    type: 'method',
-    name: methodName => methodName.startsWith('geocode.'),
-    connectionId: () => true,
-  }],
-  limit: 5, // 5 requests
-  timeRange: 60000, // per minute
-});
+// Simple rate limiting using a Map to track requests
+const rateLimitMap = new Map();
+
+function checkRateLimit(clientId, method, maxRequests = 5, timeWindow = 60000) {
+  const now = Date.now();
+  const key = `${clientId}:${method}`;
+  
+  if (!rateLimitMap.has(key)) {
+    rateLimitMap.set(key, { count: 1, resetTime: now + timeWindow });
+    return { allowed: true };
+  }
+  
+  const record = rateLimitMap.get(key);
+  
+  if (now > record.resetTime) {
+    // Reset the counter
+    rateLimitMap.set(key, { count: 1, resetTime: now + timeWindow });
+    return { allowed: true };
+  }
+  
+  if (record.count >= maxRequests) {
+    return { allowed: false };
+  }
+  
+  record.count++;
+  return { allowed: true };
+}
 
 Meteor.methods({
   /**
@@ -26,8 +41,9 @@ Meteor.methods({
     if (!address) return null;
     
     // Apply rate limiting
-    const invocation = geocodingLimiter.check(this.userId || this.connection.clientAddress);
-    if (invocation.allowed !== true) {
+    const clientId = this.userId || this.connection.clientAddress || 'anonymous';
+    const rateLimitCheck = checkRateLimit(clientId, 'geocode.address');
+    if (!rateLimitCheck.allowed) {
       throw new Meteor.Error('rate-limit-exceeded', 'Too many geocoding requests');
     }
     
@@ -75,8 +91,9 @@ Meteor.methods({
     check(longitude, Number);
     
     // Apply rate limiting
-    const invocation = geocodingLimiter.check(this.userId || this.connection.clientAddress);
-    if (invocation.allowed !== true) {
+    const clientId = this.userId || this.connection.clientAddress || 'anonymous';
+    const rateLimitCheck = checkRateLimit(clientId, 'geocode.reverse');
+    if (!rateLimitCheck.allowed) {
       throw new Meteor.Error('rate-limit-exceeded', 'Too many geocoding requests');
     }
     
@@ -110,7 +127,7 @@ Meteor.methods({
         let state = '';
         let country = '';
         
-        addressComponents.forEach(component => {
+        addressComponents.forEach(function(component) {
           const types = component.types;
           
           if (types.includes('street_number')) {
@@ -145,9 +162,6 @@ Meteor.methods({
    * Get Google Maps API key for client-side use
    */
   'getGoogleMapsApiKey': function() {
-    // Check if user is logged in and is admin
-    const isAdmin = this.userId && Roles.userIsInRole(this.userId, 'admin');
-    
     // Return the appropriate API key based on security context
     if (Meteor.settings.public && Meteor.settings.public.googleMaps && Meteor.settings.public.googleMaps.publicApiKey) {
       // Return public key with restricted permissions

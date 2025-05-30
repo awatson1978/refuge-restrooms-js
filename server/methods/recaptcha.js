@@ -2,19 +2,34 @@
 import { Meteor } from 'meteor/meteor';
 import { check } from 'meteor/check';
 import { HTTP } from 'meteor/http';
-import { RateLimiter } from 'meteor/ddp-rate-limiter';
 
-// Set up rate limiter for reCAPTCHA verification
-const recaptchaLimiter = new RateLimiter({
-  ruleSets: [{
-    userId: () => true,
-    type: 'method',
-    name: 'recaptcha.verify',
-    connectionId: () => true,
-  }],
-  limit: 10, // 10 requests
-  timeRange: 60000, // per minute
-});
+// Simple rate limiting using a Map to track requests
+const rateLimitMap = new Map();
+
+function checkRateLimit(clientId, method, maxRequests = 10, timeWindow = 60000) {
+  const now = Date.now();
+  const key = `${clientId}:${method}`;
+  
+  if (!rateLimitMap.has(key)) {
+    rateLimitMap.set(key, { count: 1, resetTime: now + timeWindow });
+    return { allowed: true };
+  }
+  
+  const record = rateLimitMap.get(key);
+  
+  if (now > record.resetTime) {
+    // Reset the counter
+    rateLimitMap.set(key, { count: 1, resetTime: now + timeWindow });
+    return { allowed: true };
+  }
+  
+  if (record.count >= maxRequests) {
+    return { allowed: false };
+  }
+  
+  record.count++;
+  return { allowed: true };
+}
 
 Meteor.methods({
   /**
@@ -26,8 +41,9 @@ Meteor.methods({
     check(token, String);
     
     // Apply rate limiting
-    const invocation = recaptchaLimiter.check(this.userId || this.connection.clientAddress);
-    if (invocation.allowed !== true) {
+    const clientId = this.userId || this.connection.clientAddress || 'anonymous';
+    const rateLimitCheck = checkRateLimit(clientId, 'recaptcha.verify');
+    if (!rateLimitCheck.allowed) {
       throw new Meteor.Error('rate-limit-exceeded', 'Too many reCAPTCHA verification requests');
     }
     
@@ -65,7 +81,7 @@ Meteor.methods({
 });
 
 // Export reCAPTCHA site key for client-side use
-Meteor.startup(() => {
+Meteor.startup(function() {
   // Publish the reCAPTCHA site key to the client
   if (Meteor.settings.public && !Meteor.settings.public.recaptchaSiteKey) {
     // Only log this warning if we don't have a public key configured
