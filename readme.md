@@ -1,6 +1,6 @@
 # REFUGE Restrooms - Full Stack Javascript Rewrite
 
-This is a rewrite of the REFUGE Restrooms application to use full-stack Node/Javascript.  This implementation uses the Meteor.js tech stack and a MongoDB backend, supports API access to the original database, and can hydrate a MongoDB copy of the database.  It supports geospatial $near operators; as well as compiling to both Android and iOS via Cordova.  This rewrite was vibe-coded, so caveat emptor and code quality checks are encouraged.  
+This is a rewrite of the [REFUGE Restrooms](https://github.com/RefugeRestrooms/refugerestrooms) application to use full-stack Node/Javascript.  This implementation uses the Meteor.js tech stack and a MongoDB backend, supports API access to the original database, and can hydrate a MongoDB copy of the database.  It supports geospatial $near operators; as well as compiling to both Android and iOS via Cordova.  This rewrite was vibe-coded, so caveat emptor and code quality checks are encouraged.  
 
 ## Quick Start
 
