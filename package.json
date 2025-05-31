@@ -30,6 +30,7 @@
     "simpl-schema": "^3.4.1"
   },
   "meteor": {
+    "modern": true,
     "mainModule": {
       "client": "client/main.jsx",
       "server": "server/main.js"
