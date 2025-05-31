@@ -762,5 +762,201 @@ Meteor.methods({
     set(fhirLocation, 'extension', extensions);
 
     return fhirLocation;
+  },
+  'fhir.locations.searchByLocation': async function(lat, lng, options = {}) {
+    check(lat, Number);
+    check(lng, Number);
+    check(options, {
+      limit: Match.Optional(Number),
+      skip: Match.Optional(Number),
+      radius: Match.Optional(Number),
+      returnLegacyFormat: Match.Optional(Boolean)
+    });
+    
+    const limit = get(options, 'limit', 20);
+    const skip = get(options, 'skip', 0);
+    const radius = get(options, 'radius', 20); // miles
+    const returnLegacy = get(options, 'returnLegacyFormat', true);
+    
+    console.log(`FHIR Location search: ${lat},${lng} radius=${radius}mi limit=${limit}`);
+    
+    try {
+      // Convert radius to decimal degrees (approximation: 1 degree ≈ 69 miles)
+      const degreeRadius = radius / 69;
+      
+      // Build MongoDB query for geospatial search
+      const geoQuery = {
+        'position.latitude': { 
+          $gte: lat - degreeRadius, 
+          $lte: lat + degreeRadius 
+        },
+        'position.longitude': { 
+          $gte: lng - degreeRadius, 
+          $lte: lng + degreeRadius 
+        },
+        status: 'active'
+      };
+
+      // Query local FHIR locations
+      let locations = await FhirLocations.find(geoQuery, {
+        limit,
+        skip,
+        sort: { 'meta.lastUpdated': -1 }
+      }).fetchAsync();
+
+      console.log(`Found ${locations.length} local FHIR locations`);
+
+      // AGGRESSIVE HYDRATION: Always try hydration for location searches to get fresh data
+      if (FhirHydrationService.isHydrationEnabled()) {
+        try {
+          console.log('Running hydration for location search...');
+          const hydrationResult = await FhirHydrationService.hydrateByLocation(lat, lng, limit);
+          
+          const savedCount = get(hydrationResult, 'saved', 0);
+          console.log(`Hydration result: ${savedCount} saved, ${get(hydrationResult, 'skipped', 0)} skipped, ${get(hydrationResult, 'failed', 0)} failed`);
+          
+          if (savedCount > 0) {
+            console.log(`Hydrated ${savedCount} new locations, re-querying...`);
+            
+            // Re-query after hydration
+            locations = await FhirLocations.find(geoQuery, {
+              limit,
+              skip,
+              sort: { 'meta.lastUpdated': -1 }
+            }).fetchAsync();
+            
+            console.log(`After hydration: ${locations.length} total locations found`);
+          }
+        } catch (hydrationError) {
+          console.error('Hydration failed, continuing with local results:', hydrationError);
+        }
+      } else {
+        console.warn('Hydration is disabled - only showing local results');
+      }
+
+      // Calculate distances and sort by proximity
+      locations = locations.map(function(location) {
+        const position = get(location, 'position', {});
+        const locLat = get(position, 'latitude');
+        const locLng = get(position, 'longitude');
+        
+        let distance = null;
+        if (locLat && locLng) {
+          // Haversine formula
+          const R = 3959; // Earth radius in miles
+          const dLat = (locLat - lat) * Math.PI / 180;
+          const dLng = (locLng - lng) * Math.PI / 180;
+          const a = 
+            Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat * Math.PI / 180) * Math.cos(locLat * Math.PI / 180) * 
+            Math.sin(dLng/2) * Math.sin(dLng/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          distance = Math.round((R * c) * 100) / 100; // Round to 2 decimals
+        }
+        
+        return { ...location, distance };
+      });
+
+      // Sort by distance (closest first)
+      locations.sort(function(a, b) {
+        const distA = get(a, 'distance', Infinity);
+        const distB = get(b, 'distance', Infinity);
+        return distA - distB;
+      });
+
+      console.log(`Returning ${locations.length} locations for coordinates ${lat},${lng}`);
+
+      // Convert to legacy format if requested
+      if (returnLegacy) {
+        return locations.map(fhirLocationToLegacy);
+      }
+
+      return locations;
+      
+    } catch (error) {
+      console.error('Error in FHIR location search by coordinates:', error);
+      throw new Meteor.Error('fhir-search-error', error.message);
+    }
+  },
+
+  /**
+   * Enhanced text search with aggressive hydration
+   */
+  'fhir.locations.searchByText': async function(searchText, options = {}) {
+    check(searchText, String);
+    check(options, {
+      limit: Match.Optional(Number),
+      skip: Match.Optional(Number),
+      returnLegacyFormat: Match.Optional(Boolean)
+    });
+    
+    const limit = get(options, 'limit', 20);
+    const skip = get(options, 'skip', 0);
+    const returnLegacy = get(options, 'returnLegacyFormat', true);
+    
+    console.log(`FHIR Location text search: "${searchText}" limit=${limit}`);
+    
+    try {
+      // Build text search query
+      const textQuery = {
+        $or: [
+          { name: { $regex: searchText, $options: 'i' } },
+          { 'address.line': { $regex: searchText, $options: 'i' } },
+          { 'address.city': { $regex: searchText, $options: 'i' } },
+          { 'address.state': { $regex: searchText, $options: 'i' } }
+        ],
+        status: 'active'
+      };
+
+      // Query local FHIR locations
+      let locations = await FhirLocations.find(textQuery, {
+        limit,
+        skip,
+        sort: { 'meta.lastUpdated': -1 }
+      }).fetchAsync();
+
+      console.log(`Found ${locations.length} local FHIR locations for text search`);
+
+      // AGGRESSIVE HYDRATION: Always try hydration for text searches
+      if (FhirHydrationService.isHydrationEnabled()) {
+        try {
+          console.log('Running hydration for text search...');
+          const hydrationResult = await FhirHydrationService.hydrateBySearch(searchText, limit);
+          
+          const savedCount = get(hydrationResult, 'saved', 0);
+          console.log(`Text search hydration result: ${savedCount} saved, ${get(hydrationResult, 'skipped', 0)} skipped, ${get(hydrationResult, 'failed', 0)} failed`);
+          
+          if (savedCount > 0) {
+            console.log(`Hydrated ${savedCount} new locations from text search, re-querying...`);
+            
+            // Re-query after hydration
+            locations = await FhirLocations.find(textQuery, {
+              limit,
+              skip,
+              sort: { 'meta.lastUpdated': -1 }
+            }).fetchAsync();
+            
+            console.log(`After text search hydration: ${locations.length} total locations found`);
+          }
+        } catch (hydrationError) {
+          console.error('Text search hydration failed, continuing with local results:', hydrationError);
+        }
+      } else {
+        console.warn('Hydration is disabled - only showing local text search results');
+      }
+
+      console.log(`Returning ${locations.length} locations for text search "${searchText}"`);
+
+      // Convert to legacy format if requested
+      if (returnLegacy) {
+        return locations.map(fhirLocationToLegacy);
+      }
+
+      return locations;
+      
+    } catch (error) {
+      console.error('Error in FHIR location text search:', error);
+      throw new Meteor.Error('fhir-search-error', error.message);
+    }
   }
 });
