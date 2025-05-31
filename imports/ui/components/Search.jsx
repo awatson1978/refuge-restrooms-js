@@ -14,6 +14,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import { useTranslation } from 'react-i18next';
+import { Meteor } from 'meteor/meteor';
 
 const Search = ({ isSplash = false }) => {
   const { t } = useTranslation();
@@ -27,15 +28,47 @@ const Search = ({ isSplash = false }) => {
     setSearchValue(event.target.value);
   };
   
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!searchValue.trim()) return;
     
     setIsSearching(true);
+    setError('');
     
-    // Navigate to search results using the search term
-    navigate(`/restrooms?search=${encodeURIComponent(searchValue)}`);
-    
-    // No need to reset isSearching since we're navigating away
+    try {
+      // Check if the search looks like a location (city, state format)
+      const locationPattern = /^[a-zA-Z\s]+,\s*[a-zA-Z\s]+$/;
+      const isLocationSearch = locationPattern.test(searchValue.trim());
+      
+      if (isLocationSearch) {
+        console.log('Attempting to geocode location search:', searchValue);
+        
+        try {
+          // Try to geocode the search term
+          const coordinates = await Meteor.callAsync('geocode.address', searchValue.trim());
+          
+          if (coordinates && coordinates.latitude && coordinates.longitude) {
+            console.log('Geocoded successfully:', coordinates);
+            // Navigate with coordinates for location-based search
+            navigate(`/restrooms?lat=${coordinates.latitude}&lng=${coordinates.longitude}`);
+            return;
+          } else {
+            console.log('Geocoding failed, falling back to text search');
+          }
+        } catch (geocodeError) {
+          console.error('Geocoding error, falling back to text search:', geocodeError);
+        }
+      }
+      
+      // Fall back to text search
+      console.log('Using text search for:', searchValue);
+      navigate(`/restrooms?search=${encodeURIComponent(searchValue)}`);
+      
+    } catch (err) {
+      console.error('Search error:', err);
+      setError('Search failed. Please try again.');
+    } finally {
+      setIsSearching(false);
+    }
   };
   
   const handleKeyPress = (event) => {

@@ -372,12 +372,15 @@ const RestroomsList = () => {
                       view,
                       page,
                       filters,
-                      hasCoords: hasValidCoordinates
+                      hasCoords: hasValidCoordinates,
+                      searchParam,
+                      latitude,
+                      longitude
                     }, null, 2)}
                   </Box>
                 </Typography>
                 
-                <Box sx={{ mt: 2 }}>
+                <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                   <Button 
                     variant="outlined" 
                     size="small" 
@@ -396,7 +399,7 @@ const RestroomsList = () => {
                   >
                     Add FHIR Test Data
                   </Button>
-                  {' '}
+
                   <Button 
                     variant="outlined" 
                     size="small" 
@@ -415,6 +418,71 @@ const RestroomsList = () => {
                     }}
                   >
                     Clear FHIR Test Data
+                  </Button>
+
+                  <Button 
+                    variant="outlined" 
+                    size="small" 
+                    color="primary"
+                    onClick={() => {
+                      Meteor.call('debug.testHydration', 'Evansville', (err, res) => { 
+                        if (err) {
+                          console.error('Error testing hydration:', err);
+                          alert('Error testing hydration: ' + err.message);
+                        } else {
+                          console.log('Hydration test result:', res);
+                          if (res.success) {
+                            alert(`Hydration test successful! Found ${res.details.apiResults} API results. Hydration: ${JSON.stringify(res.details.hydrationResult)}`);
+                          } else {
+                            alert(`Hydration test failed: ${res.error}`);
+                          }
+                        }
+                      });
+                    }}
+                  >
+                    Test Evansville Hydration
+                  </Button>
+
+                  <Button 
+                    variant="outlined" 
+                    size="small" 
+                    color="secondary"
+                    onClick={() => {
+                      Meteor.call('debug.checkConfig', (err, res) => { 
+                        if (err) {
+                          console.error('Error checking config:', err);
+                          alert('Error checking config: ' + err.message);
+                        } else {
+                          console.log('Config check result:', res);
+                          alert('Config logged to console. Check browser console for details.');
+                        }
+                      });
+                    }}
+                  >
+                    Check Config
+                  </Button>
+
+                  <Button 
+                    variant="outlined" 
+                    size="small" 
+                    color="warning"
+                    onClick={async () => {
+                      try {
+                        // Test geocoding
+                        const coords = await Meteor.callAsync('geocode.address', 'Evansville, IN');
+                        console.log('Geocoding result:', coords);
+                        if (coords) {
+                          alert(`Geocoded Evansville, IN to: ${coords.latitude}, ${coords.longitude}`);
+                        } else {
+                          alert('Geocoding failed - no coordinates returned');
+                        }
+                      } catch (err) {
+                        console.error('Geocoding error:', err);
+                        alert('Geocoding error: ' + err.message);
+                      }
+                    }}
+                  >
+                    Test Geocoding
                   </Button>
                 </Box>
               </Paper>
