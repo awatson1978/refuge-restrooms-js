@@ -409,5 +409,158 @@ Meteor.methods({
     // Fall back to no key (will show developer mode)
     console.warn('No Google Maps public API key found');
     return '';
+  },
+
+  'geocode.addressFixed': async function(address) {
+    check(address, String);
+    
+    if (!address) return null;
+    
+    // Apply rate limiting
+    const clientId = this.userId || this.connection.clientAddress || 'anonymous';
+    const rateLimitCheck = checkRateLimit(clientId, 'geocode.address');
+    if (!rateLimitCheck.allowed) {
+      throw new Meteor.Error('rate-limit-exceeded', 'Too many geocoding requests');
+    }
+    
+    // Get API key from environment variable or settings
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY || 
+                    get(Meteor, 'settings.private.googleMaps.apiKey');
+    
+    if (!apiKey) {
+      console.error('Google Maps API key is not configured');
+      throw new Meteor.Error('missing-api-key', 'Google Maps API key is not configured');
+    }
+    
+    console.log(`Geocoding address: "${address}" with API key: ${apiKey ? 'present' : 'missing'}`);
+    
+    // Build the URL
+    const baseUrl = 'https://maps.googleapis.com/maps/api/geocode/json';
+    const params = new URLSearchParams({
+      address: address,
+      key: apiKey
+    });
+    const fullUrl = `${baseUrl}?${params.toString()}`;
+    
+    console.log(`Full geocoding URL: ${fullUrl.replace(apiKey, 'API_KEY_HIDDEN')}`);
+    
+    try {
+      console.log('Making fetch request to Google Maps API...');
+      
+      // Use Meteor 3's native fetch
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Meteor/3.0 REFUGE-Restrooms-App'
+        },
+        // Add timeout using AbortController
+        signal: AbortSignal.timeout(15000)
+      });
+      
+      console.log('Fetch response received:', {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+      
+      if (!response.ok) {
+        console.error(`HTTP ${response.status} error from Google Maps API: ${response.statusText}`);
+        throw new Meteor.Error('http-error', `Geocoding service returned HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      // Parse JSON response
+      const responseData = await response.json();
+      
+      console.log('Parsed geocoding response:', {
+        status: get(responseData, 'status'),
+        resultsCount: get(responseData, 'results.length', 0),
+        errorMessage: get(responseData, 'error_message')
+      });
+      
+      const status = get(responseData, 'status');
+      const results = get(responseData, 'results', []);
+      const errorMessage = get(responseData, 'error_message');
+      
+      if (status === 'OK' && results.length > 0) {
+        const location = get(results, '[0].geometry.location');
+        const lat = get(location, 'lat');
+        const lng = get(location, 'lng');
+        
+        if (lat && lng) {
+          console.log(`Successfully geocoded "${address}" to ${lat}, ${lng}`);
+          return {
+            latitude: lat,
+            longitude: lng
+          };
+        } else {
+          console.error('No coordinates in geocoding result:', location);
+          return null;
+        }
+      } else if (status === 'ZERO_RESULTS') {
+        console.log(`No results found for address: "${address}"`);
+        return null;
+      } else if (status === 'OVER_QUERY_LIMIT') {
+        console.error('Google Maps API quota exceeded');
+        throw new Meteor.Error('quota-exceeded', 'Geocoding quota exceeded');
+      } else if (status === 'REQUEST_DENIED') {
+        console.error('Google Maps API request denied:', errorMessage || 'No error message');
+        throw new Meteor.Error('request-denied', `Geocoding request denied: ${errorMessage || 'Check API key permissions'}`);
+      } else if (status === 'INVALID_REQUEST') {
+        console.error('Invalid geocoding request:', errorMessage || 'No error message');
+        throw new Meteor.Error('invalid-request', `Invalid geocoding request: ${errorMessage || 'Unknown reason'}`);
+      } else {
+        console.error('Geocoding failed with status:', status, 'Error:', errorMessage);
+        throw new Meteor.Error('geocoding-failed', `Geocoding failed: ${status} - ${errorMessage || 'Unknown error'}`);
+      }
+      
+    } catch (error) {
+      console.error('Geocoding fetch error:', error);
+      
+      // Handle specific error types
+      if (error.name === 'AbortError') {
+        throw new Meteor.Error('timeout-error', 'Geocoding request timed out');
+      } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        throw new Meteor.Error('network-error', 'Unable to connect to Google Maps API. Check your internet connection.');
+      } else if (error instanceof Meteor.Error) {
+        throw error; // Re-throw Meteor errors as-is
+      } else {
+        throw new Meteor.Error('geocoding-failed', `Error geocoding address: ${error.message || 'Unknown error'}`);
+      }
+    }
+  },
+
+  /**
+   * Test the new fetch-based geocoding
+   */
+  'debug.testFetchGeocoding': async function(address = 'Evansville, IN') {
+    // Only allow in development
+    if (process.env.NODE_ENV === 'production') {
+      throw new Meteor.Error('not-allowed', 'Debug methods not allowed in production');
+    }
+    
+    check(address, String);
+    
+    console.log(`=== TESTING FETCH-BASED GEOCODING: "${address}" ===`);
+    
+    try {
+      const result = await Meteor.callAsync('geocode.addressFixed', address);
+      console.log('Fetch geocoding result:', result);
+      
+      return {
+        success: true,
+        result,
+        address
+      };
+      
+    } catch (error) {
+      console.error('Fetch geocoding test failed:', error);
+      return {
+        success: false,
+        error: error.message || 'Unknown error',
+        errorType: error.error || 'unknown',
+        address
+      };
+    }
   }
 });

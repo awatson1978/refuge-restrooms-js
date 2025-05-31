@@ -9,9 +9,11 @@ import './methods/fhirLocations';
 import '../imports/api/fhir/services/hydrationService';
 
 // Import other server methods
+import './methods/debug';
 import './methods/geocoding';
 import './methods/recaptcha'; 
 import './publications/admin';
+
 
 // Import legacy collections for migration/compatibility
 import { Restrooms } from '../imports/api/restrooms/collection';
